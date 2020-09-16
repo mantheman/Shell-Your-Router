@@ -9,7 +9,7 @@ TARGET = secret_shell
 FIRMWARE_ROOT_DIR = /mnt/c/Users/ykrin/Projects/embedded/firmware-mod-kit/fmk/rootfs
 
 # CC = gcc
-CC = /mnt/c/Users/ykrin/Projects/embedded/tools/buildroot-2020.02.3/output/host/bin/mipsel-linux-gcc
+CC = $(HOME)/shared_projects/embedded/tools/buildroot-2020.02.3/output/host/bin/mipsel-linux-gcc
 RM = rm -rf
 
 CFLAGS = -I$(INCLUDE_DIR) -Wall -Wextra -Werror -std=c99
