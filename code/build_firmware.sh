@@ -45,7 +45,7 @@ update_firmware_version() {
     echo "========================="
     echo "Updating firmware version"
     echo "========================="
-    firmware_version_file=$FMK_DIR/$FMK_FIRMWARE_DIR/rootfs/etc/version
+    firmware_version_file=$FMK_DIR/$FMK_FIRMWARE_DIR/rootfs/etc.tmp/version
 
     echo "Trying to update fimrware version to: $RANDOM_FIRMWARE_VERSION" 
     echo $RANDOM_FIRMWARE_VERSION > $firmware_version_file

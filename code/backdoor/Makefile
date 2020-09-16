@@ -9,7 +9,7 @@ TARGET = secret_shell
 FIRMWARE_ROOT_DIR = /mnt/c/Users/ykrin/Projects/embedded/firmware-mod-kit/fmk/rootfs
 
 # CC = gcc
-CC = $(HOME)/shared_projects/embedded/tools/buildroot-2020.02.3/output/host/bin/mipsel-linux-gcc
+CC = $(HOME)/tools/buildroot-2020.02.3/output/host/bin/mipsel-linux-gcc
 RM = rm -rf
 
 CFLAGS = -I$(INCLUDE_DIR) -Wall -Wextra -Werror -std=c99
@@ -27,9 +27,11 @@ all: default
 # $< - The name of the first prerequisite.
 # $^ - The names of all the prerequisites.
 $(OBJ_DIR)/%.o: $(SOURCE_DIR)/%.c $(HEADERS)
+	@mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/$(TARGET): $(OBJECTS)
+	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $^ $(LIBS) -o $@
 
 .PHONY: clean

