@@ -41,6 +41,8 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Recaluclates firmware checksum for edimax routers (specificaly EDIMAX BR-6524n)")
 
     parser.add_argument('path', help="Path of firmware file.", type=str)
+    parser.add_argument('-u', '--update', help="Should write back checksum to the firmware.", 
+                        action='store_true')
 
     return parser.parse_args()
 
@@ -53,10 +55,11 @@ def main():
     print(f"Firmware {firmware_path} checksum: {hex(checksum)}")
 
 
-    if click.confirm("Do you want to update the firmware checksum?"):
+    if args.update or click.confirm("Do you want to update the firmware checksum?"):
         with open(firmware_path, 'r+b') as firmware:
             firmware.seek(checksum_offset)
             firmware.write(checksum.to_bytes(CHECKSUM_SIZE, 'little'))
+            print("Updated firmware checksum.")
 
 
 if __name__ == "__main__":
