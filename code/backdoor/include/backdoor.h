@@ -1,3 +1,4 @@
+#pragma once
 /**
  * @file backdoor.h
  * @author Yuval Krinsky (ykrinksy@gmail.com)
@@ -6,3 +7,4 @@
  */
 
 #define SHELL_LISTENING_PORT (1337)
+#define LOG_PATH ("/tmp/boring.log")
