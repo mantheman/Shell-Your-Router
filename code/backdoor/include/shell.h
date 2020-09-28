@@ -1,10 +1,10 @@
-#pragma once
 /**
  * @file shell.h
  * @author Yuval Krinsky (ykrinksy@gmail.com)
  * @brief Manages tcp server that opens shells for incoming connections.
  * @date 2020-09-17
  */
+#pragma once
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -42,7 +42,7 @@ return_code_t shell__init_server(int32_t server_port, logger__log_t *logger, int
 /**
  * @brief Frees the resources of the shell server.
  * 
- * @param server_socket [in] Pointer to server's socket (should be acquired by init_shell_server).
+ * @param server_socket [in] Pointer to server's socket (should be acquired by shell__init_server).
  * @param logger [in] Program's logger.
  * @return return_code_t 
  */
@@ -54,6 +54,6 @@ return_code_t shell__destroy_server(int32_t *server_socket_ptr, logger__log_t *l
  * @param server_socket [in] Shell server's socket.
  * @param logger [in] Program's logger.
  * @return return_code_t 
- * @note This function blocks untill a new connection is received.
+ * @note This function blocks until a new connection is received.
  */
 return_code_t shell__handle_new_connection(int32_t server_socket, logger__log_t *logger);

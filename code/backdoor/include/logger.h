@@ -1,10 +1,11 @@
-#pragma once
 /**
  * @file logger.h
  * @author Yuval Krinsky (ykrinksy@gmail.com)
  * @brief Manages the program's logging.
  * @date 2020-09-17
  */
+#pragma once
+#include <stdio.h>
 
 #include "return_codes.h"
 
@@ -23,7 +24,7 @@ typedef enum log_level_e{
 } log_level_t;
 
 /**
- * @brief Initialis logger.
+ * @brief Initialises logger.
  * 
  * @param log_path [in] File path of the new logger.
  * @param new_logger [out] Pointer that will hold the new logger.

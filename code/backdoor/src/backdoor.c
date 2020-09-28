@@ -11,7 +11,7 @@
 
 int main(void)
 {
-    return_code_t result = RC_UNINITIAILIZED;
+    return_code_t result = RC_UNINITIALIZED;
     logger__log_t logger = {0};
     int32_t shell_server = -1;
     int32_t temp_result = -1;

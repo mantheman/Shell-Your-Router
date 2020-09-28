@@ -13,7 +13,7 @@ static char log_levels_g[][LOG_LEVEL_MAX_SIZE] = {"DEBUG", "INFO", "WARNING", "C
 
 return_code_t logger__init_logger(char *log_path, logger__log_t *new_logger)
 {
-    return_code_t result = RC_UNINITIAILIZED;
+    return_code_t result = RC_UNINITIALIZED;
     FILE *new_log_file = NULL;
 
     if (NULL == log_path || NULL == new_logger){
@@ -33,7 +33,7 @@ l_cleanup:
 
 return_code_t logger__destory_logger(logger__log_t *logger)
 {
-    return_code_t result = RC_UNINITIAILIZED;
+    return_code_t result = RC_UNINITIALIZED;
 
     if (NULL == logger){
         handle_error(RC_LOGGER__DESTROY_LOGGER__BAD_PARAMS);
@@ -50,7 +50,7 @@ l_cleanup:
 
 return_code_t logger__log(logger__log_t *logger, log_level_t log_level, char *message)
 {
-    return_code_t result = RC_UNINITIAILIZED;
+    return_code_t result = RC_UNINITIALIZED;
     char log_message[FINAL_LOG_MESSAGE_MAX_SIZE] = {0};
     char *log_level_string = NULL;
 

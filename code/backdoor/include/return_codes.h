@@ -1,13 +1,13 @@
-#pragma once
 /**
  * @file return_codes.h
  * @author Yuval Krinsky (ykrinksy@gmail.com)
  * @brief Return codes of the program.
  * @date 2020-09-17
  */
+#pragma once
 
 typedef enum return_code_e{
-    RC_UNINITIAILIZED = -1,
+    RC_UNINITIALIZED = -1,
     RC_SUCCESS = 0,
     
     RC_BACKDOOR__MAIN__FCNTL_FAILED,

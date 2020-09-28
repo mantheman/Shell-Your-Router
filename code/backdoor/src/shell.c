@@ -21,7 +21,7 @@
 
 return_code_t shell__init_server(int32_t server_port, logger__log_t *logger, int32_t *server_socket_ptr)
 {
-    return_code_t result = RC_UNINITIAILIZED;
+    return_code_t result = RC_UNINITIALIZED;
     int32_t server_socket = -1;
     struct sockaddr_in server_address = {0};
     struct in_addr server_inteface = {0};
@@ -62,7 +62,7 @@ l_cleanup:
 
 return_code_t shell__destroy_server(int32_t *server_socket_ptr, logger__log_t *logger)
 {
-    return_code_t result = RC_UNINITIAILIZED;
+    return_code_t result = RC_UNINITIALIZED;
     if (NULL == server_socket_ptr || NULL == logger){
         handle_error(RC_SHELL__DESTROY_SERVER__BAD_PARAMS);
     }
@@ -88,7 +88,7 @@ l_cleanup:
  */
 static return_code_t start_shell(int32_t client_socket)
 {
-    return_code_t result = RC_UNINITIAILIZED;
+    return_code_t result = RC_UNINITIALIZED;
     int dup_result = -1;
     int32_t shell_fds[] = {STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO};
 
@@ -101,7 +101,7 @@ static return_code_t start_shell(int32_t client_socket)
     }
 
     execl(SHELL_PATH, SHELL_PATH, (char *)NULL);
-    // exec shouldn't return unless an error has occured.
+    // exec shouldn't return unless an error has occurred.
     handle_perror("Execl failed", RC_SHELL__START_SHELL__EXEC_FAILED);
 
 l_cleanup:
@@ -110,7 +110,7 @@ l_cleanup:
 
 return_code_t shell__handle_new_connection(int32_t server_socket, logger__log_t *logger)
 {
-    return_code_t result = RC_UNINITIAILIZED;
+    return_code_t result = RC_UNINITIALIZED;
     struct sockaddr_in client_address = {0};
     socklen_t client_address_size = 0;
     int32_t client_socket = -1;
