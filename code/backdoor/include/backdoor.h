@@ -7,4 +7,4 @@
  */
 
 #define SHELL_LISTENING_PORT (1337)
-#define LOG_PATH ("/tmp/boring.log")
+#define LOG_PATH ("/tmp/bd.log")

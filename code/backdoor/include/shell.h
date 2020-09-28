@@ -20,8 +20,13 @@
 #include "return_codes.h"
 #include "logger.h"
 
+#ifdef DEBUG
+#define SHELL_PATH ("/bin/sh")
+#else
 #define SHELL_PATH ("/bin/ash")
-#define WELCOME_BANNER ("Welcome to a secret shell :)\n")
+#endif
+
+#define WELCOME_BANNER ("Welcome to a secret shell...\n")
 #define MAX_LISTENING_QUEUE (5)
 
 /**

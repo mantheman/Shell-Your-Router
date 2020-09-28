@@ -54,7 +54,7 @@ return_code_t shell__init_server(int32_t server_port, logger__log_t *logger, int
     *server_socket_ptr = server_socket;
 
     snprintf(log_message, MAX_LOG_MESSAGE_SIZE, "Shell server started on port: %d", server_port);
-    logger__log(logger, INFO, log_message);
+    logger__log(logger, LOG_INFO, log_message);
     result = RC_SUCCESS;
 l_cleanup:
     return result;
@@ -73,7 +73,7 @@ return_code_t shell__destroy_server(int32_t *server_socket_ptr, logger__log_t *l
 
     *server_socket_ptr = -1;
 
-    logger__log(logger, INFO, "Closed shell server successfully.");
+    logger__log(logger, LOG_INFO, "Closed shell server successfully.");
     result = RC_SUCCESS;
 l_cleanup:
     return result;
@@ -136,7 +136,7 @@ return_code_t shell__handle_new_connection(int32_t server_socket, logger__log_t 
         inet_ntoa(client_address.sin_addr),
         client_port
     );
-    logger__log(logger, INFO, log_message);
+    logger__log(logger, LOG_INFO, log_message);
 
     send(client_socket, WELCOME_BANNER, strlen(WELCOME_BANNER), 0);
 

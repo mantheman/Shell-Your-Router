@@ -15,11 +15,11 @@ typedef struct logger__log_s {
 } logger__log_t;
 
 typedef enum log_level_e{
-    DEBUG = 0,
-    INFO,
-    WARNING,
-    CRITICAL,
-    ERROR,
+    LOG_DEBUG = 0,
+    LOG_INFO,
+    LOG_WARNING,
+    LOG_CRITICAL,
+    LOG_ERROR,
 } log_level_t;
 
 /**
