@@ -12,7 +12,7 @@ RM = rm -rf
 
 # -s (strip) flag to make the executable smaller.
 CFLAGS = -I$(INCLUDE_DIR) -Wall -Wextra -Werror -std=c99 -s
-LIBS = 
+LIBS = -pthread
 
 HEADERS = $(wildcard $(INCLUDE_DIR)/*.h)
 SOURCES = $(wildcard $(SOURCE_DIR)/*.c)

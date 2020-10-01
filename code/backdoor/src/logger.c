@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE (199506L) // For flockfile and funlockfile functions.
 #include <stdio.h>
 #include <string.h>
 
@@ -61,10 +62,14 @@ return_code_t logger__log(logger__log_t *logger, log_level_t log_level, char *me
     log_level_string = log_levels_g[(int)log_level];
     snprintf(log_message, FINAL_LOG_MESSAGE_MAX_SIZE, "%s: %s\n", log_level_string, message);
 
+    flockfile(logger->log_file);
+
     fwrite(log_message, strlen(log_message), 1, logger->log_file);
     if (EOF == fflush(logger->log_file)){
         handle_perror("Fflush failed", RC_LOGGER__LOG__FFLUSH_FAILED);
     }
+
+    funlockfile(logger->log_file);
 
     result = RC_SUCCESS;
 l_cleanup:

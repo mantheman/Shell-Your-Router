@@ -51,6 +51,12 @@ return_code_t shell__init_server(int32_t server_port, logger__log_t *logger, int
         handle_perror("Listen failed", RC_SHELL__INIT_SOCKET__SOCKET_LISTEN_FAILED);
     }
 
+    // We don't want to pass the shell_server's fd to childrens shell processes.
+    temp_result = fcntl(server_socket, F_SETFD, FD_CLOEXEC);
+    if (-1 == temp_result){
+        handle_perror("Fcntl failed", RC_SHELL__INIT_SOCKET__FCNTL_FAILED);
+    }
+
     *server_socket_ptr = server_socket;
 
     snprintf(log_message, MAX_LOG_MESSAGE_SIZE, "Shell server started on port: %d", server_port);
@@ -91,6 +97,8 @@ static return_code_t start_shell(int32_t client_socket)
     return_code_t result = RC_UNINITIALIZED;
     int dup_result = -1;
     int32_t shell_fds[] = {STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO};
+
+    // TODO: Add closure of logger so it won't pass to shell process.
 
     // Set the shell's standards streams to use the client socket file descriptor.
     for (uint8_t i = 0; i < arr_length(shell_fds); ++i){
