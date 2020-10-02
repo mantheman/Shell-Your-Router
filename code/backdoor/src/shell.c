@@ -46,7 +46,7 @@ return_code_t shell__init_server(int32_t server_port, logger__log_t *logger, int
         handle_perror("Bind failed", RC_SHELL__INIT_SERVER__SOCKET_BIND_FAILED);
     }
 
-    temp_result = listen(server_socket, MAX_LISTENING_QUEUE);
+    temp_result = listen(server_socket, SHELL_MAX_LISTENING_QUEUE);
     if (-1 == temp_result){
         handle_perror("Listen failed", RC_SHELL__INIT_SOCKET__SOCKET_LISTEN_FAILED);
     }
@@ -123,7 +123,6 @@ return_code_t shell__handle_new_connection(int32_t server_socket, logger__log_t 
     socklen_t client_address_size = 0;
     int32_t client_socket = -1;
     pid_t fork_result = -1;
-    uint16_t client_port = 0;
     char log_message[MAX_LOG_MESSAGE_SIZE] = {0};
 
     if (NULL == logger){
@@ -136,13 +135,12 @@ return_code_t shell__handle_new_connection(int32_t server_socket, logger__log_t 
         handle_perror("Accept failed", RC_SHELL__HANDLE_CONNECTION__SOCKET_ACCEPT_FAILED);
     }
 
-    client_port = ntohs(client_address.sin_port);
     snprintf(
         log_message,
         MAX_LOG_MESSAGE_SIZE,
-        "New shell connection:, IP: %s, port: %d.",
+        "New shell connection: IP: %s, port: %d.",
         inet_ntoa(client_address.sin_addr),
-        client_port
+        ntohs(client_address.sin_port)
     );
     logger__log(logger, LOG_INFO, log_message);
 

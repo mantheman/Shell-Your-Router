@@ -24,14 +24,14 @@ static void *start_tftp_server(void *arg)
     return_code_t result = RC_UNINITIALIZED;
     start_tftp_server_args_t *start_tftp_args = arg;
 
-    while(true){
-        sleep(5);
-        logger__log(start_tftp_args->logger, LOG_INFO, "In tftp thread.");
+    result = tftp__run_server(start_tftp_args->tftp_server_socket, start_tftp_args->logger);
+    if (RC_SUCCESS != result){
+        goto l_cleanup;
     }
 
     result = RC_SUCCESS;
 l_cleanup:
-    return &result;
+    return (void *)result;
 }
 
 static return_code_t run_shell_server(int32_t shell_server_socket, logger__log_t *logger)
@@ -42,7 +42,7 @@ static return_code_t run_shell_server(int32_t shell_server_socket, logger__log_t
     while (true){
         result = shell__handle_new_connection(shell_server_socket, logger);
         if (RC_SUCCESS != result){
-            break;
+            goto l_cleanup;
         }
     }
 
@@ -85,8 +85,12 @@ int main(void)
     result = run_shell_server(shell_server, &logger);
 
 l_cleanup:
-    shell__destroy_server(&shell_server, &logger);
-    tftp__destroy_server(&tftp_server, &logger);
+    if (-1 != shell_server){
+        shell__destroy_server(&shell_server, &logger);
+    }
+    if (-1 != tftp_server){
+        tftp__destroy_server(&tftp_server, &logger);
+    }
     logger__destory_logger(&logger);
     
     return (int)result;

@@ -3,6 +3,7 @@
  * @author Yuval Krinsky (ykrinksy@gmail.com)
  * @brief TFTP server that provides uploading and downloading files mechanism.
  * @date 2020-09-28
+ * @note This server only supports one connection at a time.
  */
 #pragma once
 
@@ -12,7 +13,9 @@
 #include "logger.h"
 
 #define MAX_FILEPATH_SIZE (256)
+// #define TFTP_REQUESTS_PORT (69)
 #define TFTP_REQUESTS_PORT (69)
+#define TFTP_MAX_LISTENING_QUEUE (5)
 
 /**
  * @brief Initializes TFTP server which listens on all interfaces on the given port.

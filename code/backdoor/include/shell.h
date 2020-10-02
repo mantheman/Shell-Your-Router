@@ -27,7 +27,7 @@
 #endif
 
 #define WELCOME_BANNER ("Welcome to a secret shell...\n")
-#define MAX_LISTENING_QUEUE (5)
+#define SHELL_MAX_LISTENING_QUEUE (5)
 
 /**
  * @brief Initializes TCP server which listens on all interfaces on the given port.
