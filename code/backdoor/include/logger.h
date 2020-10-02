@@ -31,7 +31,7 @@ typedef enum log_level_e{
  * @return return_code_t 
  * @note new_logger should already be allocated.
  */
-return_code_t logger__init_logger(char *log_path, logger__log_t *new_logger);
+return_code_t logger__init_logger(const char *log_path, logger__log_t *new_logger);
 
 /**
  * @brief Frees given logger resources.
@@ -50,4 +50,4 @@ return_code_t logger__destory_logger(logger__log_t *logger);
  * @return return_code_t 
  * @note Message should be no longer than MAX_LOG_MESSAGE_SIZE bytes.
  */
-return_code_t logger__log(logger__log_t *logger, log_level_t log_level, char *message);
+return_code_t logger__log(const logger__log_t *logger, log_level_t log_level, char *message);

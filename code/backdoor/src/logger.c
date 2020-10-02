@@ -12,7 +12,7 @@
 static char log_levels_g[][LOG_LEVEL_MAX_SIZE] = {"DEBUG", "INFO", "WARNING", "CRITICAL", "ERROR"};
 
 
-return_code_t logger__init_logger(char *log_path, logger__log_t *new_logger)
+return_code_t logger__init_logger(const char *log_path, logger__log_t *new_logger)
 {
     return_code_t result = RC_UNINITIALIZED;
     FILE *new_log_file = NULL;
@@ -49,7 +49,7 @@ l_cleanup:
     return result;
 }
 
-return_code_t logger__log(logger__log_t *logger, log_level_t log_level, char *message)
+return_code_t logger__log(const logger__log_t *logger, log_level_t log_level, char *message)
 {
     return_code_t result = RC_UNINITIALIZED;
     char log_message[FINAL_LOG_MESSAGE_MAX_SIZE] = {0};
