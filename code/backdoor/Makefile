@@ -6,12 +6,13 @@ LIB_DIR = lib
 
 TARGET = secret_shell
 
-# CC = gcc
-CC = $(HOME)/tools/buildroot-2020.02.3/output/host/bin/mipsel-linux-gcc
+CC = gcc
+# CC = $(HOME)/tools/buildroot-2020.02.3/output/host/bin/mipsel-linux-gcc
 RM = rm -rf
 
 # -s (strip) flag to make the executable smaller.
-CFLAGS = -I$(INCLUDE_DIR) -Wall -Wextra -Werror -std=c99 -s
+# CFLAGS = -I$(INCLUDE_DIR) -Wall -Wextra -Werror -std=c99 -s -g -DDEBUG
+CFLAGS = -I$(INCLUDE_DIR) -Wall -Wextra -Werror -std=c99 -g -DDEBUG
 LIBS = -pthread
 
 HEADERS = $(wildcard $(INCLUDE_DIR)/*.h)

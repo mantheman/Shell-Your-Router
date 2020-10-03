@@ -20,7 +20,7 @@
 #define MAX_DATAGRAM_SIZE (516) // As defined in Tftp RFC(RFC 1350).
 #define BINARY_MODE ("octet")
 #define TIMEOUT_IN_SECONDS (3)
-#define SEND_DATA_ATTEMPTS (2)
+#define SEND_DATA_ATTEMPTS (5)
 
 #define RANDOM_PORT (rand() % 10000 + 10000) // 10 thousands ports should be enough.
 #define EQUAL_STRINGS (0)
@@ -81,6 +81,14 @@ typedef struct tftp_connection_s{
     tftp_packet_t *last_packet;
 } tftp_connection_t;
 
+/**
+ * @brief Send tftp error packet to the client.
+ * 
+ * @param connection_socket [in] Connection socket to the client (should have the right source port).
+ * @param client_address [in] Address of the client.
+ * @param error_code [in] Which error has happened.
+ * @param message [in] Message that elaborate on the error happened, max size is MAX_ERROR_MESSAGE_SIZE.
+ */
 static void send_error(
     int32_t connection_socket,
     const struct sockaddr_in *client_address,
@@ -89,6 +97,7 @@ static void send_error(
 )
 {
     error_packet_t packet = {0}; 
+
     assert(NULL != client_address && NULL != message);
 
     packet.opcode = htons(ERROR);
@@ -101,15 +110,28 @@ static void send_error(
         sizeof(packet),
         0, 
         (struct sockaddr *)client_address,
-        sizeof(client_address)
+        sizeof(*client_address)
     );
 
 }
 
+/**
+ * @brief Send tftp packet to the client, then waits for response packet. Tries for a few attempts.
+ * 
+ * @param connection_socket [in] Connection socket to the client (should have the right source port).
+ * @param client_address [in] Address of the client.
+ * @param send_packet [in] The tftp packet to be sent.
+ * @param packet_size [in] Size of packet to be sent.
+ * @param is_valid_response_ptr [out] True if recieved a response from the client, false otherwise.
+ * @param recv_packet [out] The response packet from the client.
+ * @return return_code_t 
+ */
 static return_code_t send_packet(
     int32_t connection_socket,
     const struct sockaddr_in *client_address,
     const tftp_packet_t *send_packet,
+    uint32_t packet_size,
+    bool *is_valid_response_ptr,
     tftp_packet_t *recv_packet
 )
 {
@@ -117,23 +139,24 @@ static return_code_t send_packet(
     ssize_t bytes_read = -1;
     struct sockaddr_in incoming_address = {0};
     socklen_t incoming_address_length = 0;
+    bool recived_valid_response = false;
 
-    assert(NULL != client_address && NULL != send_packet && NULL != recv_packet);
+    assert(NULL != client_address && NULL != send_packet);
+    assert(NULL != is_valid_response_ptr && NULL != recv_packet);
 
     for(uint8_t send_attempt = 0; send_attempt < SEND_DATA_ATTEMPTS; ++send_attempt){
         sendto(
             connection_socket,
-            &send_packet,
-            sizeof(send_packet),
+            send_packet,
+            packet_size,
             0, 
             (struct sockaddr *)client_address,
-            sizeof(client_address)
+            sizeof(*client_address)
         );
-
         incoming_address_length = sizeof(incoming_address);
         bytes_read = recvfrom(
             connection_socket,
-            &recv_packet,
+            recv_packet,
             sizeof(recv_packet),
             0,
             (struct sockaddr *)&incoming_address,
@@ -153,15 +176,24 @@ static return_code_t send_packet(
                 continue;
             }
 
+        recived_valid_response = true;
         // Received a valid response, no need to continue.
         break;
     }
 
     result = RC_SUCCESS;
 l_cleanup:
+    *is_valid_response_ptr = recived_valid_response;
     return result;
 }
 
+/**
+ * @brief Initializes UDP socket that binds to a given port.
+ * 
+ * @param server_port [in] Port for new socket.
+ * @param server_socket_ptr [out] The new UDP socket.
+ * @return return_code_t 
+ */
 static return_code_t init_udp_server_socket(int32_t server_port, int32_t *server_socket_ptr)
 {
     return_code_t result = RC_UNINITIALIZED;
@@ -194,6 +226,13 @@ l_cleanup:
 
 }
 
+/**
+ * @brief Initializes socket for a tftp connection. Socket will have a random port, 
+ *        and will have a timeout for receiving data.
+ * 
+ * @param connection_socket_ptr [out] Will point to the new socket.
+ * @return return_code_t 
+ */
 static return_code_t init_connection_socket(int32_t *connection_socket_ptr)
 {
     return_code_t result = RC_UNINITIALIZED;
@@ -215,7 +254,7 @@ static return_code_t init_connection_socket(int32_t *connection_socket_ptr)
     timeout.tv_sec = TIMEOUT_IN_SECONDS;
     timeout.tv_usec = 0;
     temp_result = setsockopt(connection_socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
-    if (-1 != temp_result){
+    if (-1 == temp_result){
         handle_perror("setsockopt failed", RC_TFTP__HANDLE_REQUEST__SETSOCKOPT_FAILED);
     }
 
@@ -227,10 +266,18 @@ l_cleanup:
         close(connection_socket);
     }
     return result;
-
 }
 
-static return_code_t handle_read_connection(
+/**
+ * @brief Handles the operation of reading file after read request. 
+ *        Opens requested file, and sends it's data to the client.
+ * 
+ * @param request_packet [in] The read file request packet.
+ * @param client_address [in] Address of the client.
+ * @param logger [in] Logger of the program.
+ * @return return_code_t 
+ */
+static return_code_t handle_read_request(
     const request_packet_t *request_packet,
     const struct sockaddr_in *client_address,
     const logger__log_t *logger
@@ -244,8 +291,10 @@ static return_code_t handle_read_connection(
     size_t bytes_read = 0;
     int32_t connection_socket = -1;
     data_packet_t data_packet = {0};
+    uint32_t packet_size = 0;
     uint16_t block_number = 0;
-    tftp_packet_t recv_packet = {0};
+    ack_packet_t ack_packet = {0};
+    bool received_reponse = false;
 
     assert(NULL != request_packet && NULL != client_address);
 
@@ -255,10 +304,15 @@ static return_code_t handle_read_connection(
     }
 
     filename = request_packet->filename_and_mode;
-    mode = filename + strlen(filename);
+    mode = filename + strlen(filename) + 1;
+    snprintf(log_message, MAX_LOG_MESSAGE_SIZE, "Request to read %s in mode %s", filename, mode);
+    logger__log(logger, LOG_DEBUG, log_message);
+
     if (EQUAL_STRINGS != strncasecmp(mode, BINARY_MODE, MAX_DATAGRAM_SIZE)){
         // We only support binary mode.
         send_error(connection_socket, client_address, ILLEGAL_TFTP_OPERATION, "Unsupported mode.");
+        result = RC_SUCCESS;
+        goto l_cleanup;
     }
 
     file = fopen(filename, "r");
@@ -280,25 +334,42 @@ static return_code_t handle_read_connection(
     block_number = 1;
     while(!feof(file)){
         data_packet.block_number = htons(block_number);
-        bytes_read = fread(data_packet.data, BLOCK_SIZE, 1, file);
+        bytes_read = fread(data_packet.data, 1, BLOCK_SIZE, file);
         if (ferror(file)){
             send_error(connection_socket, client_address, UNDEFINED, strerror(errno));
             break;
         }
-        send_packet(connection_socket, client_address, (tftp_packet_t *)&data_packet, &recv_packet);
 
-        if(ntohs(recv_packet.ack.opcode) != ACK){
+        snprintf(log_message, MAX_LOG_MESSAGE_SIZE, "Read %ld bytes, sending DATA with block %d.", bytes_read, block_number);
+        logger__log(logger, LOG_DEBUG, log_message);
+
+        packet_size = sizeof(data_packet) - (BLOCK_SIZE - bytes_read); 
+        send_packet(
+            connection_socket,
+            client_address,
+            (tftp_packet_t *)&data_packet,
+            packet_size,
+            &received_reponse,
+            (tftp_packet_t *) &ack_packet
+        );
+
+        if(!received_reponse || ntohs(ack_packet.opcode) == ERROR){
+            break;
+        }
+        if(ntohs(ack_packet.opcode) != ACK){
             send_error(connection_socket, client_address, ILLEGAL_TFTP_OPERATION, "Received invalid response.");
             break;
         } 
-        if(ntohs(recv_packet.ack.block_number) != block_number){
+        if(ntohs(ack_packet.block_number) != block_number){
             // TODO: Handle better wrong ack number.
             send_error(connection_socket, client_address, UNDEFINED, "Received wrong ack.");
             break;
         }
 
+        snprintf(log_message, MAX_LOG_MESSAGE_SIZE, "Received ack on block %d.", ntohs(ack_packet.block_number));
+        logger__log(logger, LOG_DEBUG, log_message);
+
         block_number++;
-        (void)bytes_read; // TODO: 
     }
 
     result = RC_SUCCESS;
@@ -380,7 +451,7 @@ return_code_t tftp__run_server(int32_t server_socket, logger__log_t *logger)
         snprintf(
             log_message,
             MAX_LOG_MESSAGE_SIZE,
-            "Received connection from: IP: %s, port: %d.",
+            "Received tftp request from: IP: %s, port: %d.",
             inet_ntoa(client_address.sin_addr),
             ntohs(client_address.sin_port)
         );
@@ -388,7 +459,7 @@ return_code_t tftp__run_server(int32_t server_socket, logger__log_t *logger)
         
         switch(ntohs(request_packet.opcode)){
             case RRQ:
-                handle_read_connection(&request_packet, &client_address, logger);
+                handle_read_request(&request_packet, &client_address, logger);
                 break;
             
             case WRQ:
