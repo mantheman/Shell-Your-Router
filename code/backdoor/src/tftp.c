@@ -12,6 +12,7 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <stddef.h>
 
 #include "common.h"
 #include "tftp.h"
@@ -74,13 +75,6 @@ typedef union tftp_packet_u{
     error_packet_t error;
 } tftp_packet_t;
 
-typedef struct tftp_connection_s{
-    int32_t my_tid; // TID - Transfer indefitier, in TFTP it's the UDP port.
-    int32_t other_tid;
-    uint32_t last_ack;
-    tftp_packet_t *last_packet;
-} tftp_connection_t;
-
 /**
  * @brief Send tftp error packet to the client.
  * 
@@ -122,27 +116,26 @@ static void send_error(
  * @param client_address [in] Address of the client.
  * @param send_packet [in] The tftp packet to be sent.
  * @param packet_size [in] Size of packet to be sent.
- * @param is_valid_response_ptr [out] True if recieved a response from the client, false otherwise.
- * @param recv_packet [out] The response packet from the client.
- * @return return_code_t 
+ * @param response_packet [out] The response packet from the client.
+ * @param response_size_ptr [out] Size of response packet.
+ * @return True if recieved a response from the client, false otherwise.
  */
-static return_code_t send_packet(
+static bool send_packet(
     int32_t connection_socket,
     const struct sockaddr_in *client_address,
     const tftp_packet_t *send_packet,
     uint32_t packet_size,
-    bool *is_valid_response_ptr,
-    tftp_packet_t *recv_packet
+    tftp_packet_t *response_packet,
+    uint32_t *response_size_ptr
 )
 {
-    return_code_t result = RC_UNINITIALIZED;
-    ssize_t bytes_read = -1;
+    bool recived_valid_response = false;
+    ssize_t bytes_received = -1;
     struct sockaddr_in incoming_address = {0};
     socklen_t incoming_address_length = 0;
-    bool recived_valid_response = false;
 
     assert(NULL != client_address && NULL != send_packet);
-    assert(NULL != is_valid_response_ptr && NULL != recv_packet);
+    assert(NULL != response_packet && NULL != response_size_ptr);
 
     for(uint8_t send_attempt = 0; send_attempt < SEND_DATA_ATTEMPTS; ++send_attempt){
         sendto(
@@ -154,20 +147,21 @@ static return_code_t send_packet(
             sizeof(*client_address)
         );
         incoming_address_length = sizeof(incoming_address);
-        bytes_read = recvfrom(
+        bytes_received = recvfrom(
             connection_socket,
-            recv_packet,
-            sizeof(recv_packet),
+            response_packet,
+            sizeof(*response_packet),
             0,
             (struct sockaddr *)&incoming_address,
             &incoming_address_length
         );
-        if (-1 == bytes_read){
+        if (-1 == bytes_received){
             if (EAGAIN == errno){
                 // Timeout on recv, try again.
                 continue;
             }
-            handle_perror("Recv failed", RC_TFTP__RUN_SERVER__SOCKET_RECV_FAILED);
+            send_error(connection_socket, client_address, UNDEFINED, "Internal error (recv failed).");
+            goto l_cleanup;
         }
 
         if ((client_address->sin_addr.s_addr != incoming_address.sin_addr.s_addr) || 
@@ -181,10 +175,11 @@ static return_code_t send_packet(
         break;
     }
 
-    result = RC_SUCCESS;
 l_cleanup:
-    *is_valid_response_ptr = recived_valid_response;
-    return result;
+    if(recived_valid_response){
+        *response_size_ptr = bytes_received;
+    }
+    return recived_valid_response;
 }
 
 /**
@@ -269,6 +264,67 @@ l_cleanup:
 }
 
 /**
+ * @brief Opens file requested by given request_packet. Notifies client if invalid packet was given.
+ * 
+ * @param connection_socket [in] Connection socket to the client (should have the right source port).
+ * @param client_address [in] Address of the client.
+ * @param request_packet [in] The write/read file request packet.
+ * @param logger [in] Program's logger.
+ * @return FILE pointer to requested file, NULL if an error has occured. 
+ */
+static FILE * open_requested_file(
+    int32_t connection_socket,
+    const struct sockaddr_in *client_address,
+    const request_packet_t *request_packet,
+    const logger__log_t *logger
+)
+{
+    FILE *file = NULL;
+    const char *filename = NULL;
+    char *file_operation = NULL;
+    const char *mode = NULL;
+    char log_message[MAX_LOG_MESSAGE_SIZE] = {0};
+
+    assert(NULL != request_packet && NULL != logger);
+
+    switch(ntohs(request_packet->opcode)){
+        case RRQ:
+            file_operation = "r";
+            break;
+        case WRQ:
+            file_operation = "w";
+            break;
+        default:
+            // Invalid opcode for request packet.
+            goto l_cleanup;
+    }
+    filename = request_packet->filename_and_mode;
+    mode = filename + strlen(filename) + 1;
+    snprintf(log_message, MAX_LOG_MESSAGE_SIZE, "Request to %s %s in mode %s.", file_operation, filename, mode);
+    logger__log(logger, LOG_DEBUG, log_message);
+
+    if (EQUAL_STRINGS != strncasecmp(mode, BINARY_MODE, MAX_DATAGRAM_SIZE)){
+        // We only support binary mode.
+        send_error(connection_socket, client_address, ILLEGAL_TFTP_OPERATION, "Unsupported mode.");
+        goto l_cleanup;
+    }
+
+    file = fopen(filename, file_operation);
+    if (NULL == file){
+        if (EACCES == errno){
+            send_error(connection_socket, client_address, ACCESS_VIOLATION, strerror(errno));
+        }
+        else{
+            send_error(connection_socket, client_address, UNDEFINED, strerror(errno));
+        }
+        goto l_cleanup;
+    }
+
+l_cleanup:
+    return file;
+}
+
+/**
  * @brief Handles the operation of reading file after read request. 
  *        Opens requested file, and sends it's data to the client.
  * 
@@ -284,8 +340,6 @@ static return_code_t handle_read_request(
 )
 {
     return_code_t result = RC_UNINITIALIZED;
-    const char *filename = NULL;
-    const char *mode = NULL;
     FILE *file = NULL;
     char log_message[MAX_LOG_MESSAGE_SIZE] = {0};
     size_t bytes_read = 0;
@@ -294,44 +348,25 @@ static return_code_t handle_read_request(
     uint32_t packet_size = 0;
     uint16_t block_number = 0;
     ack_packet_t ack_packet = {0};
-    bool received_reponse = false;
+    bool received_response = false;
+    uint32_t response_packet_size = 0;
 
-    assert(NULL != request_packet && NULL != client_address);
+    assert(NULL != request_packet && RRQ == ntohs(request_packet->opcode) && NULL != client_address);
 
     result = init_connection_socket(&connection_socket);
     if (RC_SUCCESS != result){
         goto l_cleanup;
     }
 
-    filename = request_packet->filename_and_mode;
-    mode = filename + strlen(filename) + 1;
-    snprintf(log_message, MAX_LOG_MESSAGE_SIZE, "Request to read %s in mode %s", filename, mode);
-    logger__log(logger, LOG_DEBUG, log_message);
-
-    if (EQUAL_STRINGS != strncasecmp(mode, BINARY_MODE, MAX_DATAGRAM_SIZE)){
-        // We only support binary mode.
-        send_error(connection_socket, client_address, ILLEGAL_TFTP_OPERATION, "Unsupported mode.");
-        result = RC_SUCCESS;
-        goto l_cleanup;
-    }
-
-    file = fopen(filename, "r");
+    file = open_requested_file(connection_socket, client_address, request_packet, logger);
     if (NULL == file){
-        if (EACCES == errno){
-            send_error(connection_socket, client_address, ACCESS_VIOLATION, strerror(errno));
-        }
-        else{
-            send_error(connection_socket, client_address, UNDEFINED, strerror(errno));
-        }
         result = RC_SUCCESS;
         goto l_cleanup;
     }
-
-    snprintf(log_message, MAX_LOG_MESSAGE_SIZE, "Starting to read file: %s", filename);
-    logger__log(logger, LOG_INFO, log_message);
 
     data_packet.opcode = htons(DATA);
     block_number = 1;
+
     while(!feof(file)){
         data_packet.block_number = htons(block_number);
         bytes_read = fread(data_packet.data, 1, BLOCK_SIZE, file);
@@ -340,23 +375,23 @@ static return_code_t handle_read_request(
             break;
         }
 
-        snprintf(log_message, MAX_LOG_MESSAGE_SIZE, "Read %ld bytes, sending DATA with block %d.", bytes_read, block_number);
+        snprintf(log_message, MAX_LOG_MESSAGE_SIZE, "Read %ld bytes, sending DATA with block #%d.", bytes_read, block_number);
         logger__log(logger, LOG_DEBUG, log_message);
 
         packet_size = sizeof(data_packet) - (BLOCK_SIZE - bytes_read); 
-        send_packet(
+        received_response = send_packet(
             connection_socket,
             client_address,
             (tftp_packet_t *)&data_packet,
             packet_size,
-            &received_reponse,
-            (tftp_packet_t *) &ack_packet
+            (tftp_packet_t *)&ack_packet,
+            &response_packet_size
         );
 
-        if(!received_reponse || ntohs(ack_packet.opcode) == ERROR){
+        if(!received_response || ntohs(ack_packet.opcode) == ERROR){
             break;
         }
-        if(ntohs(ack_packet.opcode) != ACK){
+        if((ntohs(ack_packet.opcode) != ACK) && (response_packet_size == sizeof(ack_packet))){
             send_error(connection_socket, client_address, ILLEGAL_TFTP_OPERATION, "Received invalid response.");
             break;
         } 
@@ -366,7 +401,7 @@ static return_code_t handle_read_request(
             break;
         }
 
-        snprintf(log_message, MAX_LOG_MESSAGE_SIZE, "Received ack on block %d.", ntohs(ack_packet.block_number));
+        snprintf(log_message, MAX_LOG_MESSAGE_SIZE, "Received ACK on block #%d.", ntohs(ack_packet.block_number));
         logger__log(logger, LOG_DEBUG, log_message);
 
         block_number++;
@@ -376,6 +411,119 @@ static return_code_t handle_read_request(
 l_cleanup:
     if (-1 != connection_socket){
         close(connection_socket);
+    }
+    if (NULL != file){
+        fclose(file);
+    }
+
+    return result;
+}
+
+/**
+ * 
+ * @brief Handles the operation of writing file after write request. 
+ *        Opens requested file, and sends acks on client's data packets.
+ * 
+ * @param request_packet [in] The write file request packet.
+ * @param client_address [in] Address of the client.
+ * @param logger [in] Program's logger.
+ * @return return_code_t 
+ */
+static return_code_t handle_write_request(
+    const request_packet_t *request_packet,
+    const struct sockaddr_in *client_address,
+    const logger__log_t *logger
+)
+{
+    return_code_t result = RC_UNINITIALIZED;
+    FILE *file = NULL;
+    char log_message[MAX_LOG_MESSAGE_SIZE] = {0};
+    size_t data_size = BLOCK_SIZE;
+    int32_t connection_socket = -1;
+    ack_packet_t ack_packet = {0};
+    uint16_t block_number = 0;
+    data_packet_t data_packet = {0};
+    uint32_t data_packet_size = 0;
+    bool received_response = false;
+
+    assert(NULL != request_packet && WRQ == ntohs(request_packet->opcode) && NULL != client_address);
+
+    result = init_connection_socket(&connection_socket);
+    if (RC_SUCCESS != result){
+        goto l_cleanup;
+    }
+
+    file = open_requested_file(connection_socket, client_address, request_packet, logger);
+    if (NULL == file){
+        result = RC_SUCCESS;
+        goto l_cleanup;
+    }
+
+    ack_packet.opcode = htons(ACK);
+    block_number = 0;
+    while(true){
+        snprintf(log_message, MAX_LOG_MESSAGE_SIZE, "Sending ACK on block #%d.", block_number);
+        logger__log(logger, LOG_DEBUG, log_message);
+
+        ack_packet.block_number = htons(block_number);
+        received_response = send_packet(
+            connection_socket,
+            client_address,
+            (tftp_packet_t *)&ack_packet,
+            sizeof(ack_packet),
+            (tftp_packet_t *)&data_packet,
+            &data_packet_size
+        );
+
+        if(!received_response || ntohs(data_packet.opcode) == ERROR){
+            break;
+        }
+        if(ntohs(data_packet.opcode) != DATA){
+            send_error(connection_socket, client_address, ILLEGAL_TFTP_OPERATION, "Received invalid response.");
+            break;
+        } 
+        if(ntohs(data_packet.block_number) != block_number + 1){
+            // TODO: Handle better invalid data block number.
+            send_error(connection_socket, client_address, UNDEFINED, "Received wrong data block number.");
+            break;
+        }
+
+        data_size = data_packet_size - offsetof(data_packet_t, data);
+        snprintf(
+            log_message,
+            MAX_LOG_MESSAGE_SIZE,
+            "Received DATA: block %d, data size %ld.",
+            ntohs(data_packet.block_number),
+            data_size
+        );
+        logger__log(logger, LOG_DEBUG, log_message);
+
+        fwrite(data_packet.data, 1, data_size, file);
+        block_number++;
+
+        if(BLOCK_SIZE > data_size){
+            snprintf(log_message, MAX_LOG_MESSAGE_SIZE, "Sending last ACK, block #%d.", block_number);
+            logger__log(logger, LOG_DEBUG, log_message);
+            ack_packet.block_number = htons(block_number);
+            sendto(
+                connection_socket,
+                &ack_packet,
+                sizeof(ack_packet),
+                0, 
+                (struct sockaddr *)client_address,
+                sizeof(*client_address)
+            );
+            break;
+        }
+    }
+
+    result = RC_SUCCESS;
+l_cleanup:
+    if (-1 != connection_socket){
+        close(connection_socket);
+    }
+    if (NULL != file){
+        fclose(file);
     }
 
     return result;
@@ -395,7 +543,7 @@ return_code_t tftp__init_server(int32_t server_port, logger__log_t *logger, int3
         goto l_cleanup;
     }
 
-    snprintf(log_message, MAX_LOG_MESSAGE_SIZE, "TFTP server started on port: %d", server_port);
+    snprintf(log_message, MAX_LOG_MESSAGE_SIZE, "TFTP server started on port: %d.", server_port);
     logger__log(logger, LOG_INFO, log_message);
     result = RC_SUCCESS;
 l_cleanup:
@@ -463,10 +611,8 @@ return_code_t tftp__run_server(int32_t server_socket, logger__log_t *logger)
                 break;
             
             case WRQ:
-                // TODO: Add support for writing files.
-                // handle_write_connection();
-                // break;
-                continue;
+                handle_write_request(&request_packet, &client_address, logger);
+                break;
 
             default:
                 // Invalid request, ignore.
