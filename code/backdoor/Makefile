@@ -4,24 +4,30 @@ SOURCE_DIR = src
 OBJ_DIR = obj
 LIB_DIR = lib
 
-TARGET = secret_shell
+TARGET = bd
 
 CC = gcc
-# CC = $(HOME)/tools/buildroot-2020.02.3/output/host/bin/mipsel-linux-gcc
 RM = rm -rf
 
-# -s (strip) flag to make the executable smaller.
-# CFLAGS = -I$(INCLUDE_DIR) -Wall -Wextra -Werror -std=c99 -s -g -DDEBUG
-CFLAGS = -I$(INCLUDE_DIR) -Wall -Wextra -Werror -std=c99 -g -DDEBUG
+CFLAGS = -I$(INCLUDE_DIR) -Wall -Wextra -Werror -std=c99 
 LIBS = -pthread
 
 HEADERS = $(wildcard $(INCLUDE_DIR)/*.h)
 SOURCES = $(wildcard $(SOURCE_DIR)/*.c)
 OBJECTS = $(patsubst $(SOURCE_DIR)/%.c, $(OBJ_DIR)/%.o, $(SOURCES))
 
-.PHONY: default all
-default: $(BUILD_DIR)/$(TARGET)
-all: default
+.PHONY: release
+release: CC = $(HOME)/tools/buildroot-2020.02.3/output/host/bin/mipsel-linux-gcc
+release: CFLAGS += -static -s # -s (strip) flag to make the executable smaller.
+release: executable
+
+.PHONY: debug
+debug: CC = gcc
+debug: CFLAGS += -g -DDEBUG
+debug: executable
+
+.PHONY: executable 
+executable: $(BUILD_DIR)/$(TARGET)
 
 # $@ - The file name of the target of the rule.
 # $< - The name of the first prerequisite.

@@ -375,7 +375,13 @@ static return_code_t handle_read_request(
             break;
         }
 
-        snprintf(log_message, MAX_LOG_MESSAGE_SIZE, "Read %ld bytes, sending DATA with block #%d.", bytes_read, block_number);
+        snprintf(
+            log_message,
+            MAX_LOG_MESSAGE_SIZE,
+            "Read %d bytes, sending DATA with block #%d.",
+            (int)bytes_read,
+            block_number
+        );
         logger__log(logger, LOG_DEBUG, log_message);
 
         packet_size = sizeof(data_packet) - (BLOCK_SIZE - bytes_read); 
@@ -492,9 +498,9 @@ static return_code_t handle_write_request(
         snprintf(
             log_message,
             MAX_LOG_MESSAGE_SIZE,
-            "Received DATA: block %d, data size %ld.",
+            "Received DATA: block %d, data size %d.",
             ntohs(data_packet.block_number),
-            data_size
+            (int)data_size
         );
         logger__log(logger, LOG_DEBUG, log_message);
 
