@@ -9,7 +9,7 @@ TARGET = bd
 CC = gcc
 RM = rm -rf
 
-CFLAGS = -I$(INCLUDE_DIR) -Wall -Wextra -Werror -std=c99 
+CFLAGS = -I$(INCLUDE_DIR) -Wall -Wextra -Werror -std=c99
 LIBS = -pthread
 
 HEADERS = $(wildcard $(INCLUDE_DIR)/*.h)
