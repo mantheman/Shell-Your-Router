@@ -269,14 +269,12 @@ l_cleanup:
  * @param connection_socket [in] Connection socket to the client (should have the right source port).
  * @param client_address [in] Address of the client.
  * @param request_packet [in] The write/read file request packet.
- * @param logger [in] Program's logger.
  * @return FILE pointer to requested file, NULL if an error has occured. 
  */
 static FILE * open_requested_file(
     int32_t connection_socket,
     const struct sockaddr_in *client_address,
-    const request_packet_t *request_packet,
-    const logger__log_t *logger
+    const request_packet_t *request_packet
 )
 {
     FILE *file = NULL;
@@ -285,7 +283,7 @@ static FILE * open_requested_file(
     const char *mode = NULL;
     char log_message[MAX_LOG_MESSAGE_SIZE] = {0};
 
-    assert(NULL != request_packet && NULL != logger);
+    assert(NULL != request_packet);
 
     switch(ntohs(request_packet->opcode)){
         case RRQ:
@@ -301,7 +299,7 @@ static FILE * open_requested_file(
     filename = request_packet->filename_and_mode;
     mode = filename + strlen(filename) + 1;
     snprintf(log_message, MAX_LOG_MESSAGE_SIZE, "Request to %s %s in mode %s.", file_operation, filename, mode);
-    logger__log(logger, LOG_DEBUG, log_message);
+    logger__log(LOG_DEBUG, log_message);
 
     if (EQUAL_STRINGS != strncasecmp(mode, BINARY_MODE, MAX_DATAGRAM_SIZE)){
         // We only support binary mode.
@@ -330,13 +328,11 @@ l_cleanup:
  * 
  * @param request_packet [in] The read file request packet.
  * @param client_address [in] Address of the client.
- * @param logger [in] Logger of the program.
  * @return return_code_t 
  */
 static return_code_t handle_read_request(
     const request_packet_t *request_packet,
-    const struct sockaddr_in *client_address,
-    const logger__log_t *logger
+    const struct sockaddr_in *client_address
 )
 {
     return_code_t result = RC_UNINITIALIZED;
@@ -358,7 +354,7 @@ static return_code_t handle_read_request(
         goto l_cleanup;
     }
 
-    file = open_requested_file(connection_socket, client_address, request_packet, logger);
+    file = open_requested_file(connection_socket, client_address, request_packet);
     if (NULL == file){
         result = RC_SUCCESS;
         goto l_cleanup;
@@ -382,7 +378,7 @@ static return_code_t handle_read_request(
             (int)bytes_read,
             block_number
         );
-        logger__log(logger, LOG_DEBUG, log_message);
+        logger__log(LOG_DEBUG, log_message);
 
         packet_size = sizeof(data_packet) - (BLOCK_SIZE - bytes_read); 
         received_response = send_packet(
@@ -408,7 +404,7 @@ static return_code_t handle_read_request(
         }
 
         snprintf(log_message, MAX_LOG_MESSAGE_SIZE, "Received ACK on block #%d.", ntohs(ack_packet.block_number));
-        logger__log(logger, LOG_DEBUG, log_message);
+        logger__log(LOG_DEBUG, log_message);
 
         block_number++;
     }
@@ -432,13 +428,11 @@ l_cleanup:
  * 
  * @param request_packet [in] The write file request packet.
  * @param client_address [in] Address of the client.
- * @param logger [in] Program's logger.
  * @return return_code_t 
  */
 static return_code_t handle_write_request(
     const request_packet_t *request_packet,
-    const struct sockaddr_in *client_address,
-    const logger__log_t *logger
+    const struct sockaddr_in *client_address
 )
 {
     return_code_t result = RC_UNINITIALIZED;
@@ -459,7 +453,7 @@ static return_code_t handle_write_request(
         goto l_cleanup;
     }
 
-    file = open_requested_file(connection_socket, client_address, request_packet, logger);
+    file = open_requested_file(connection_socket, client_address, request_packet);
     if (NULL == file){
         result = RC_SUCCESS;
         goto l_cleanup;
@@ -469,7 +463,7 @@ static return_code_t handle_write_request(
     block_number = 0;
     while(true){
         snprintf(log_message, MAX_LOG_MESSAGE_SIZE, "Sending ACK on block #%d.", block_number);
-        logger__log(logger, LOG_DEBUG, log_message);
+        logger__log(LOG_DEBUG, log_message);
 
         ack_packet.block_number = htons(block_number);
         received_response = send_packet(
@@ -502,14 +496,14 @@ static return_code_t handle_write_request(
             ntohs(data_packet.block_number),
             (int)data_size
         );
-        logger__log(logger, LOG_DEBUG, log_message);
+        logger__log(LOG_DEBUG, log_message);
 
         fwrite(data_packet.data, 1, data_size, file);
         block_number++;
 
         if(BLOCK_SIZE > data_size){
             snprintf(log_message, MAX_LOG_MESSAGE_SIZE, "Sending last ACK, block #%d.", block_number);
-            logger__log(logger, LOG_DEBUG, log_message);
+            logger__log(LOG_DEBUG, log_message);
             ack_packet.block_number = htons(block_number);
             sendto(
                 connection_socket,
@@ -535,12 +529,12 @@ l_cleanup:
     return result;
 }
 
-return_code_t tftp__init_server(int32_t server_port, logger__log_t *logger, int32_t *server_socket_ptr)
+return_code_t tftp__init_server(int32_t server_port, int32_t *server_socket_ptr)
 {
     return_code_t result = RC_UNINITIALIZED;
     char log_message[MAX_LOG_MESSAGE_SIZE] = {0};
 
-    if (NULL == server_socket_ptr || NULL == logger || 0 == server_port){
+    if (NULL == server_socket_ptr || 0 == server_port){
         handle_error(RC_TFTP__INIT_SERVER__BAD_PARAMS);
     }
 
@@ -550,16 +544,16 @@ return_code_t tftp__init_server(int32_t server_port, logger__log_t *logger, int3
     }
 
     snprintf(log_message, MAX_LOG_MESSAGE_SIZE, "TFTP server started on port: %d.", server_port);
-    logger__log(logger, LOG_INFO, log_message);
+    logger__log(LOG_INFO, log_message);
     result = RC_SUCCESS;
 l_cleanup:
     return result;
 }
 
-return_code_t tftp__destroy_server(int32_t *server_socket_ptr, logger__log_t *logger)
+return_code_t tftp__destroy_server(int32_t *server_socket_ptr)
 {
     return_code_t result = RC_UNINITIALIZED;
-    if (NULL == server_socket_ptr || NULL == logger){
+    if (NULL == server_socket_ptr){
         handle_error(RC_TFTP__DESTROY_SERVER__BAD_PARAMS);
     }
 
@@ -569,14 +563,14 @@ return_code_t tftp__destroy_server(int32_t *server_socket_ptr, logger__log_t *lo
 
     *server_socket_ptr = -1;
 
-    logger__log(logger, LOG_INFO, "Closed tftp server successfully.");
+    logger__log(LOG_INFO, "Closed tftp server successfully.");
 
     result = RC_SUCCESS;
 l_cleanup:
     return result;
 }
 
-return_code_t tftp__run_server(int32_t server_socket, logger__log_t *logger)
+return_code_t tftp__run_server(int32_t server_socket)
 {
     return_code_t result = RC_UNINITIALIZED;
     request_packet_t request_packet = {0};
@@ -584,10 +578,6 @@ return_code_t tftp__run_server(int32_t server_socket, logger__log_t *logger)
     struct sockaddr_in client_address = {0};
     socklen_t client_address_length = sizeof(client_address);
     char log_message[MAX_LOG_MESSAGE_SIZE] = {0};
-
-    if (NULL == logger){
-        handle_error(RC_TFTP__RUN_SERVER__BAD_PARAMS);
-    }
 
     while (true){
         bytes_read = recvfrom(
@@ -609,15 +599,15 @@ return_code_t tftp__run_server(int32_t server_socket, logger__log_t *logger)
             inet_ntoa(client_address.sin_addr),
             ntohs(client_address.sin_port)
         );
-        logger__log(logger, LOG_DEBUG, log_message);
+        logger__log(LOG_DEBUG, log_message);
         
         switch(ntohs(request_packet.opcode)){
             case RRQ:
-                handle_read_request(&request_packet, &client_address, logger);
+                handle_read_request(&request_packet, &client_address);
                 break;
             
             case WRQ:
-                handle_write_request(&request_packet, &client_address, logger);
+                handle_write_request(&request_packet, &client_address);
                 break;
 
             default:

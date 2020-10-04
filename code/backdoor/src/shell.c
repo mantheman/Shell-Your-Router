@@ -12,14 +12,10 @@
 #include "shell.h"
 #include "common.h"
 
-
-#define LISTENING_PORT (1337)
-
 #define FORK_FAILED (-1)
 #define FORK_CHILD_PROCESS (0)
 
-
-return_code_t shell__init_server(int32_t server_port, logger__log_t *logger, int32_t *server_socket_ptr)
+return_code_t shell__init_server(int32_t server_port, int32_t *server_socket_ptr)
 {
     return_code_t result = RC_UNINITIALIZED;
     int32_t server_socket = -1;
@@ -28,7 +24,7 @@ return_code_t shell__init_server(int32_t server_port, logger__log_t *logger, int
     int temp_result = -1;
     char log_message[MAX_LOG_MESSAGE_SIZE] = {0};
 
-    if (NULL == server_socket_ptr || NULL == logger || 0 == server_port){
+    if (NULL == server_socket_ptr || 0 == server_port){
         handle_error(RC_SHELL__INIT_SERVER__BAD_PARAMS);
     }
 
@@ -60,16 +56,16 @@ return_code_t shell__init_server(int32_t server_port, logger__log_t *logger, int
     *server_socket_ptr = server_socket;
 
     snprintf(log_message, MAX_LOG_MESSAGE_SIZE, "Shell server started on port: %d", server_port);
-    logger__log(logger, LOG_INFO, log_message);
+    logger__log(LOG_INFO, log_message);
     result = RC_SUCCESS;
 l_cleanup:
     return result;
 }
 
-return_code_t shell__destroy_server(int32_t *server_socket_ptr, logger__log_t *logger)
+return_code_t shell__destroy_server(int32_t *server_socket_ptr)
 {
     return_code_t result = RC_UNINITIALIZED;
-    if (NULL == server_socket_ptr || NULL == logger){
+    if (NULL == server_socket_ptr){
         handle_error(RC_SHELL__DESTROY_SERVER__BAD_PARAMS);
     }
 
@@ -79,7 +75,7 @@ return_code_t shell__destroy_server(int32_t *server_socket_ptr, logger__log_t *l
 
     *server_socket_ptr = -1;
 
-    logger__log(logger, LOG_INFO, "Closed shell server successfully.");
+    logger__log(LOG_INFO, "Closed shell server successfully.");
     result = RC_SUCCESS;
 l_cleanup:
     return result;
@@ -116,7 +112,7 @@ l_cleanup:
     return result;
 }
 
-return_code_t shell__handle_new_connection(int32_t server_socket, logger__log_t *logger)
+return_code_t shell__handle_new_connection(int32_t server_socket)
 {
     return_code_t result = RC_UNINITIALIZED;
     struct sockaddr_in client_address = {0};
@@ -124,10 +120,6 @@ return_code_t shell__handle_new_connection(int32_t server_socket, logger__log_t 
     int32_t client_socket = -1;
     pid_t fork_result = -1;
     char log_message[MAX_LOG_MESSAGE_SIZE] = {0};
-
-    if (NULL == logger){
-        handle_error(RC_SHELL__HANDLE_CONNECTION__BAD_PARAMS);
-    }
 
     client_address_size = sizeof(client_address);
     client_socket = accept(server_socket, (struct sockaddr *)&client_address, &client_address_size);
@@ -142,7 +134,7 @@ return_code_t shell__handle_new_connection(int32_t server_socket, logger__log_t 
         inet_ntoa(client_address.sin_addr),
         ntohs(client_address.sin_port)
     );
-    logger__log(logger, LOG_INFO, log_message);
+    logger__log(LOG_INFO, log_message);
 
     send(client_socket, WELCOME_BANNER, strlen(WELCOME_BANNER), 0);
 
