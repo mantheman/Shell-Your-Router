@@ -612,7 +612,7 @@ return_code_t tftp__run_server(int32_t server_socket)
             inet_ntoa(client_address.sin_addr),
             ntohs(client_address.sin_port)
         );
-        logger__log(LOG_DEBUG, log_message);
+        logger__log(LOG_INFO, log_message);
         
         switch(ntohs(request_packet.opcode)){
             case RRQ:
@@ -627,6 +627,7 @@ return_code_t tftp__run_server(int32_t server_socket)
                 // Invalid request, ignore.
                 continue;
         }
+        logger__log(LOG_INFO, "Finished handling latest tftp request.");
     }
 
     result = RC_SUCCESS;

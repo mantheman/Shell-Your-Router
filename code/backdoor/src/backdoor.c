@@ -32,7 +32,7 @@ static return_code_t run_tftp_server(uint32_t server_port, char *log_path)
 
     assert(NULL != log_path);
 
-    result = logger__init_logger(log_path);
+    result = logger__init_logger(log_path, LOG_INFO);
     if (RC_SUCCESS != result){
         goto l_cleanup;
     }
@@ -83,7 +83,7 @@ int main(void)
 
     tftpd_alive = true;
 
-    result = logger__init_logger(SHELL_LOG_PATH);
+    result = logger__init_logger(SHELL_LOG_PATH, LOG_INFO);
     if (RC_SUCCESS != result){
         goto l_cleanup;
     }

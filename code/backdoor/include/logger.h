@@ -23,9 +23,10 @@ typedef enum log_level_e{
  * @brief Initialises the program's logger.
  * 
  * @param log_path [in] File path of the new logger.
+ * @param min_log_level [in] Minimum threshold for log messages to be written to log file.
  * @return return_code_t 
  */
-return_code_t logger__init_logger(const char *log_path);
+return_code_t logger__init_logger(const char *log_path, log_level_t min_log_level);
 
 /**
  * @brief Frees the program's logger resources.

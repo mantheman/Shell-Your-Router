@@ -14,12 +14,13 @@ static char log_levels_g[][LOG_LEVEL_MAX_SIZE] = {"DEBUG", "INFO", "WARNING", "C
 
 typedef struct logger__log_s {
     FILE * log_file;
+    log_level_t min_log_level;
 } logger__log_t;
 
 // Global logger of the program.
 static logger__log_t *g_logger = NULL;
 
-return_code_t logger__init_logger(const char *log_path)
+return_code_t logger__init_logger(const char *log_path, log_level_t min_log_level)
 {
     return_code_t result = RC_UNINITIALIZED;
     FILE *new_log_file = NULL;
@@ -43,6 +44,7 @@ return_code_t logger__init_logger(const char *log_path)
     }
 
     g_logger->log_file = new_log_file;
+    g_logger->min_log_level = min_log_level;
 
     result = RC_SUCCESS;
 l_cleanup:
@@ -81,6 +83,11 @@ return_code_t logger__log(log_level_t log_level, char *message)
 
     if (NULL == message){
         handle_error(RC_LOGGER__LOG__BAD_PARAMS);
+    }
+
+    if (g_logger->min_log_level > log_level){
+        result = RC_SUCCESS;
+        goto l_cleanup;
     }
 
     log_level_string = log_levels_g[(int)log_level];
