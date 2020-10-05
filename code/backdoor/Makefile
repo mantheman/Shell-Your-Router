@@ -4,22 +4,31 @@ SOURCE_DIR = src
 OBJ_DIR = obj
 LIB_DIR = lib
 
-TARGET = secret_shell
+TARGET = bd
 
-# CC = gcc
-CC = $(HOME)/tools/buildroot-2020.02.3/output/host/bin/mipsel-linux-gcc
+CC = gcc
 RM = rm -rf
 
 CFLAGS = -I$(INCLUDE_DIR) -Wall -Wextra -Werror -std=c99
-LIBS = 
+LIBS =
 
 HEADERS = $(wildcard $(INCLUDE_DIR)/*.h)
 SOURCES = $(wildcard $(SOURCE_DIR)/*.c)
 OBJECTS = $(patsubst $(SOURCE_DIR)/%.c, $(OBJ_DIR)/%.o, $(SOURCES))
 
-.PHONY: default all
-default: $(BUILD_DIR)/$(TARGET)
-all: default
+# TODO: Change gcc path to relative path in repo, after adding it to the repo.
+.PHONY: release
+release: CC = $(HOME)/tools/crosstool-ng-1.23.0/output/.build/mipsel-ralink-linux-uclibc/buildtools/bin/mipsel-ralink-linux-uclibc-gcc
+release: CFLAGS += -s # -s (strip) flag to make the executable smaller.
+release: executable
+
+.PHONY: debug
+debug: CC = gcc
+debug: CFLAGS += -g -DDEBUG
+debug: executable
+
+.PHONY: executable 
+executable: $(BUILD_DIR)/$(TARGET)
 
 # $@ - The file name of the target of the rule.
 # $< - The name of the first prerequisite.
