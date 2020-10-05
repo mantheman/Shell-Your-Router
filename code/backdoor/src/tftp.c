@@ -91,12 +91,22 @@ static void send_error(
 )
 {
     error_packet_t packet = {0}; 
+    char log_message[MAX_LOG_MESSAGE_SIZE] = {0};
 
     assert(NULL != client_address && NULL != message);
 
     packet.opcode = htons(ERROR);
     packet.error_code = htons(error_code);
     strncpy(packet.error_message, message, MAX_ERROR_MESSAGE_SIZE);
+
+    snprintf(
+        log_message,
+        MAX_LOG_MESSAGE_SIZE,
+        "Sending error %d with message: %s",
+        error_code,
+        message
+    );
+    logger__log(LOG_DEBUG, log_message);
 
     sendto(
         connection_socket,
@@ -118,7 +128,7 @@ static void send_error(
  * @param packet_size [in] Size of packet to be sent.
  * @param response_packet [out] The response packet from the client.
  * @param response_size_ptr [out] Size of response packet.
- * @return True if recieved a response from the client, false otherwise.
+ * @return True if received a response from the client, false otherwise.
  */
 static bool send_packet(
     int32_t connection_socket,
@@ -129,7 +139,7 @@ static bool send_packet(
     uint32_t *response_size_ptr
 )
 {
-    bool recived_valid_response = false;
+    bool received_valid_response = false;
     ssize_t bytes_received = -1;
     struct sockaddr_in incoming_address = {0};
     socklen_t incoming_address_length = 0;
@@ -170,16 +180,16 @@ static bool send_packet(
                 continue;
             }
 
-        recived_valid_response = true;
+        received_valid_response = true;
         // Received a valid response, no need to continue.
         break;
     }
 
 l_cleanup:
-    if(recived_valid_response){
+    if(received_valid_response){
         *response_size_ptr = bytes_received;
     }
-    return recived_valid_response;
+    return received_valid_response;
 }
 
 /**
@@ -269,7 +279,7 @@ l_cleanup:
  * @param connection_socket [in] Connection socket to the client (should have the right source port).
  * @param client_address [in] Address of the client.
  * @param request_packet [in] The write/read file request packet.
- * @return FILE pointer to requested file, NULL if an error has occured. 
+ * @return FILE pointer to requested file, NULL if an error has occurred. 
  */
 static FILE * open_requested_file(
     int32_t connection_socket,
@@ -299,7 +309,7 @@ static FILE * open_requested_file(
     filename = request_packet->filename_and_mode;
     mode = filename + strlen(filename) + 1;
     snprintf(log_message, MAX_LOG_MESSAGE_SIZE, "Request to %s %s in mode %s.", file_operation, filename, mode);
-    logger__log(LOG_DEBUG, log_message);
+    logger__log(LOG_INFO, log_message);
 
     if (EQUAL_STRINGS != strncasecmp(mode, BINARY_MODE, MAX_DATAGRAM_SIZE)){
         // We only support binary mode.
@@ -319,6 +329,9 @@ static FILE * open_requested_file(
     }
 
 l_cleanup:
+    if (NULL == file){
+        logger__log(LOG_WARNING, "Unable to open requested file");
+    }
     return file;
 }
 

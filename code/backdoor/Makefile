@@ -17,8 +17,8 @@ SOURCES = $(wildcard $(SOURCE_DIR)/*.c)
 OBJECTS = $(patsubst $(SOURCE_DIR)/%.c, $(OBJ_DIR)/%.o, $(SOURCES))
 
 .PHONY: release
-release: CC = $(HOME)/tools/buildroot-2020.02.3/output/host/bin/mipsel-linux-gcc
-release: CFLAGS += -static -s # -s (strip) flag to make the executable smaller.
+release: CC = $(HOME)/tools/crosstool-ng-1.23.0/output/.build/mipsel-ralink-linux-uclibc/buildtools/bin/mipsel-ralink-linux-uclibc-gcc
+release: CFLAGS += -s # -s (strip) flag to make the executable smaller.
 release: executable
 
 .PHONY: debug
