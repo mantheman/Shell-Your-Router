@@ -10,12 +10,13 @@ CC = gcc
 RM = rm -rf
 
 CFLAGS = -I$(INCLUDE_DIR) -Wall -Wextra -Werror -std=c99
-LIBS = -pthread
+LIBS =
 
 HEADERS = $(wildcard $(INCLUDE_DIR)/*.h)
 SOURCES = $(wildcard $(SOURCE_DIR)/*.c)
 OBJECTS = $(patsubst $(SOURCE_DIR)/%.c, $(OBJ_DIR)/%.o, $(SOURCES))
 
+# TODO: Change gcc path to relative path in repo, after adding it to the repo.
 .PHONY: release
 release: CC = $(HOME)/tools/crosstool-ng-1.23.0/output/.build/mipsel-ralink-linux-uclibc/buildtools/bin/mipsel-ralink-linux-uclibc-gcc
 release: CFLAGS += -s # -s (strip) flag to make the executable smaller.
