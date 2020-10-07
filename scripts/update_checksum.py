@@ -1,3 +1,6 @@
+"""
+Fix the checksum of Edimax BR-6524n firmware binary files.
+"""
 import sys
 import argparse
 
@@ -19,7 +22,7 @@ WORD_MASK = 0xFFFF
 HEADER_SIZE = 20
 CHECKSUM_SIZE = WORD_SIZE
 
-def caclulate_checksum(firmware_path):
+def calculate_checksum(firmware_path):
     print(f"Calculating checksum on firmware: {firmware_path}")
     with open(firmware_path, 'rb') as firmware:
         header = FIRMWARE_HEADER_STRUCT.parse(firmware.read(HEADER_SIZE))
@@ -38,7 +41,7 @@ def caclulate_checksum(firmware_path):
     return checksum, checksum_offset
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Recaluclates firmware checksum for edimax routers (specificaly EDIMAX BR-6524n)")
+    parser = argparse.ArgumentParser(description="Recalculates firmware checksum for Edimax routers (specifically EDIMAX BR-6524n)")
 
     parser.add_argument('path', help="Path of firmware file.", type=str)
     parser.add_argument('-u', '--update', help="Should write back checksum to the firmware.", 
@@ -51,7 +54,7 @@ def main():
     args = parse_args()
     firmware_path = args.path
 
-    checksum, checksum_offset = caclulate_checksum(firmware_path)
+    checksum, checksum_offset = calculate_checksum(firmware_path)
     print(f"Firmware {firmware_path} checksum: {hex(checksum)}")
 
 

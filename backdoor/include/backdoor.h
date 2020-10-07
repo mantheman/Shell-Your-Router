@@ -6,6 +6,6 @@
  */
 #pragma once
 
-#define SHELL_SERVER_PORT (1338)
+#define SHELL_SERVER_PORT (1337)
 #define SHELL_LOG_PATH ("/tmp/bd.log")
 #define TFTP_LOG_PATH ("/tmp/tftp.log")

