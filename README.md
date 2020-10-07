@@ -2,7 +2,7 @@
 C backdoor with shell and tftp servers, specifically meant to **run on Linux** routers.
 
 ## Installation
-Cloning the repo:
+First, clone this repository:
 ```bash
 git clone https://github.com/ykrinsky/Shell-Your-Router.git
 ```
@@ -16,14 +16,14 @@ make release
 ```
 You should run the backdoor with root privileges, as it's opens a socket on port 69 (TFTP server).
 
-# Shell
+## Shell
 After running the backdoor, you can connect to it's host with the beloved netcat.
 * The backdoor opens shell server that listen to new connections on **port 1337**.
 * The backdoor supports many shell connections in parallel.
 * The shell connection is based on TCP and it uses plain text for communication.
 * The log of the shell server can be found at /tmp/bd.log.
 
-# TFTP Server
+## TFTP Server
 The backdoor has 2 processes, one for handling new shell connections and one for handling TFTP (Trivial File Transfer Protocol) requests. 
 * The TFTP server listens for requests on port 69.
 * The server can handle requests of both uploading and downloading files.
@@ -62,7 +62,7 @@ As Firmware-Mod-Kit suggests - you don't want to increase your firmware size. So
 # Clears ~400 KB
 mips-linux-gnu-strip rootfs/bin/rt2860ap.o 
 ```
-And then you can use the backdoor to upload more files after the router is running, as the router has 4 MB flash and 16 MB RAM.
+Then you can use the backdoor to upload more files after the router is running, as the router has 4 MB flash and 16 MB RAM.
 
 ### Toolchain
 mipsel-unknown-linux-uclibc.zip is a toolchain I created with [crosstool-NG](https://github.com/crosstool-ng/crosstool-ng). 
